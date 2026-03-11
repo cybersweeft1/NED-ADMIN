@@ -52,7 +52,6 @@
         .qr-side { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
         #pdf_qrcode { display: inline-block; margin-bottom: 10px; }
         
-        /* RIGHT ALIGNED VERIFY TEXT */
         .verify-text { 
             font-size: 14px; 
             color: #333; 
@@ -63,7 +62,7 @@
 
         .pdf-footer { position: absolute; bottom: 30px; width: calc(100% - 110px); font-size: 10px; color: #999; display: flex; justify-content: flex-end; border-top: 1px solid #eee; padding-top: 8px; }
 
-        .preview-container { margin: 20px auto; border: 1px solid #ccc; max-width: 400px; }
+        .preview-container { margin: 20px auto; border: 1px solid #ccc; max-width: 400px; overflow: hidden; }
         #canvasPreview { width: 100%; display: block; }
     </style>
 </head>
@@ -148,27 +147,25 @@
     <div class="sub-text">Academic report submission: <span class="complied-tag">Complied</span></div>
 
     <div class="section-header">Contribution</div>
-    <div class="sub-text">Amount contributed to support platform: N/A (via Partner)<br>
-    <div class="issued-title">Issued by</div>  
+    <div class="sub-text">Amount contributed to support platform: N/A (via Partner)</div>
+    <br>
+    <div class="issued-title">Issued by</div>   
     <div class="issued-container">
         <div class="issued-left">
-            <img src="logo.png" class="logo-img">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Coat_of_arms_of_Nigeria.png" class="logo-img">
             <div class="issued-text">
+                <div class="nerd-brand">N.E.R.D</div>
                 <div>The Nigeria Education Repository and Databank<br>
-                    (N.E.R.D)<br>
                 Under the National Policy for NERD<br>
-                    Email: support@ned.gov.ng | Phone: +234 806 004 <br>4989<br>
-                    Website: www.ned.gov.ng
+                Email: support@ned.gov.ng | Phone: +234 806 004 4989<br>
+                Website: www.ned.gov.ng
                 </div>
             </div>
         </div>
         <div class="qr-side">
             <div id="pdf_qrcode"></div>
             <div class="verify-text">
-                Verify NDN: http://esmat.ned<br>
-                .gov.ng/ai/esmat/verify-ndn.<br>
-                php?ndn=NDN-<br>
-                <span id="pdf_verify_id"></span>
+                Verify NDN: http://esmat.ned.gov.ng/ai/esmat/verify-ndn.php?ndn=<span id="pdf_verify_id"></span>
             </div>
         </div>
     </div>
@@ -179,7 +176,6 @@
 </div>
 
 <script>
-    // Note: Ensure APPS_SCRIPT_URL points to the LATEST deployment
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzgmB5HykRNLp93hVjYTPpDnBHiP33sxDtp7cJ_DIhZ5JRX5eBihy0syc2tMLYvFyoC/exec'; 
     const SHEET_READ_URL = 'https://docs.google.com/spreadsheets/d/1RBpClxl8hIRW3Y0PJdClYRebtGlYu_yJE7IWGVU_7to/gviz/tq?tqx=out:json';
     const QR_BASE = 'https://esmat-ned-gov.com/?id=';
@@ -199,7 +195,6 @@
     }
     fetchLastId();
 
-    // Helper to read file as Base64
     const toBase64 = file => new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -210,7 +205,7 @@
     document.getElementById('adminForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = document.getElementById('subBtn');
-        btn.disabled = true; btn.innerText = "Uploading File & Syncing...";
+        btn.disabled = true; btn.innerText = "Processing & Syncing...";
 
         const fileInput = document.getElementById('originalPdf');
         let fileData = null;
@@ -222,62 +217,66 @@
             fileName = file.name;
         }
 
+        // Increment ID Logic
         const prefix = currentLastId.substring(0, currentLastId.length - 2); 
         const nextId = prefix + (parseInt(currentLastId.slice(-2), 10) + 1).toString().padStart(2, '0');
+        
         const now = new Date();
-        const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + ' ' + now.toTimeString().split(' ')[0];
+        const dateStr = now.toLocaleDateString() + " " + now.toLocaleTimeString();
 
         const formData = {
-            title: document.getElementById('title').value,
+            title: document.getElementById('title').value.toUpperCase(),
             name: document.getElementById('name').value,
             institution: document.getElementById('institution').value,
             faculty: document.getElementById('faculty').value,
-            dept: document.getElementById('dept').value,
+            dept: document.getElementById('dept').value.toUpperCase(),
             type: document.getElementById('type').value,
             fileData: fileData,
             fileName: fileName
         };
 
-        try {
-            // Note: We use 'POST' with JSON body. 
-            // In Apps Script, Ensure you have the Drive API service enabled.
-            await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(formData) });
+        // UI TRANSITION (Happens immediately so user isn't stuck)
+        document.getElementById('pdf_ndn_top').innerText = nextId;
+        document.getElementById('pdf_verify_id').innerText = nextId;
+        document.getElementById('pdf_title').innerText = formData.title;
+        document.getElementById('pdf_name').innerText = formData.name;
+        document.getElementById('pdf_inst').innerText = formData.institution;
+        document.getElementById('pdf_faculty').innerText = formData.faculty;
+        document.getElementById('pdf_dept').innerText = formData.dept;
+        document.getElementById('pdf_type').innerText = formData.type;
+        document.getElementById('pdf_date').innerText = dateStr;
 
-            document.getElementById('pdf_ndn_top').innerText = nextId;
-            document.getElementById('pdf_verify_id').innerText = nextId;
-            document.getElementById('pdf_title').innerText = formData.title;
-            document.getElementById('pdf_name').innerText = formData.name;
-            document.getElementById('pdf_inst').innerText = formData.institution;
-            document.getElementById('pdf_faculty').innerText = formData.faculty;
-            document.getElementById('pdf_dept').innerText = formData.dept;
-            document.getElementById('pdf_type').innerText = formData.type;
-            document.getElementById('pdf_date').innerText = dateStr;
+        document.getElementById('pdf_qrcode').innerHTML = "";
+        new QRCode(document.getElementById("pdf_qrcode"), {
+            text: QR_BASE + nextId,
+            width: 110, height: 110,
+            correctLevel: QRCode.Level.H
+        });
 
-            document.getElementById('pdf_qrcode').innerHTML = "";
-            new QRCode(document.getElementById("pdf_qrcode"), {
-                text: QR_BASE + nextId,
-                width: 110, height: 110,
-                correctLevel: QRCode.Level.H
-            });
+        document.getElementById('formContainer').style.display = 'none';
+        document.getElementById('successScreen').style.display = 'block';
 
-            document.getElementById('formContainer').style.display = 'none';
-            document.getElementById('successScreen').style.display = 'block';
+        // ASYNC UPLOAD (Behind the scenes)
+        fetch(APPS_SCRIPT_URL, { 
+            method: 'POST', 
+            body: JSON.stringify(formData) 
+        }).catch(err => console.log("Silent Upload Backgrounded"));
 
-            setTimeout(async () => {
-                const element = document.getElementById('pdfTemplate');
-                finalCanvas = await html2canvas(element, { scale: 3, useCORS: true });
-                document.getElementById('renderingMsg').style.display = 'none';
-                document.getElementById('previewArea').appendChild(finalCanvas);
-                finalCanvas.id = "canvasPreview";
-            }, 600);
-
-        } catch (err) { alert("Error uploading!"); btn.disabled = false; btn.innerText = "RETRY UPLOAD"; }
+        // RENDER PREVIEW
+        setTimeout(async () => {
+            const element = document.getElementById('pdfTemplate');
+            finalCanvas = await html2canvas(element, { scale: 3, useCORS: true });
+            document.getElementById('renderingMsg').style.display = 'none';
+            document.getElementById('previewArea').appendChild(finalCanvas);
+            finalCanvas.id = "canvasPreview";
+        }, 1000);
     });
 
     function downloadPDF() {
+        if(!finalCanvas) return alert("Still rendering HD preview...");
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
-        const imgData = finalCanvas.toDataURL('image/jpeg', 1.0);
+        const imgData = finalCanvas.toDataURL('image/jpeg', 0.95);
         pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
         pdf.save(`Clearance_${document.getElementById('pdf_ndn_top').innerText}.pdf`);
     }
