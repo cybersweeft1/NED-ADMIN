@@ -100,7 +100,7 @@
 <div class="container" id="successScreen">
     <h2 style="color: #2e7d32;">Clearance Ready</h2>
     <div class="preview-container" id="previewArea">
-        <p id="renderingMsg">Generating HD Replica...</p>
+        <p id="renderingMsg">Generating Document...</p>
     </div>
     <button style="background: #1976d2;" onclick="downloadPDF()">DOWNLOAD OFFICIAL PDF</button>
     <button style="background: #555; margin-top:10px;" onclick="window.location.reload()">REGISTER NEW</button>
@@ -220,15 +220,19 @@
         const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + ' ' + now.toTimeString().split(' ')[0];
 
         const formData = {
-            title: document.getElementById('title').value.toUpperCase(),
-            name: document.getElementById('name').value,
-            institution: document.getElementById('institution').value,
-            faculty: document.getElementById('faculty').value,
-            dept: document.getElementById('dept').value.toUpperCase(),
-            type: document.getElementById('type').value,
-            fileData: fileData,
-            fileName: file.name
-        };
+    title: document.getElementById('title').value.toUpperCase(),
+    name: document.getElementById('name').value,
+    institution: document.getElementById('institution').value,
+    faculty: document.getElementById('faculty').value,
+    // Converts "Computer Science" to "CS"
+    dept: document.getElementById('dept').value
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase())
+            .join(''),
+    type: document.getElementById('type').value,
+    fileData: fileData,
+    fileName: file.name
+};
 
         // UI UPDATES (Immediate)
         document.getElementById('pdf_ndn_top').innerText = nextId;
