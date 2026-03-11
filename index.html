@@ -91,6 +91,9 @@
             <option value="Project">Project</option>
             <option value="Thesis">Thesis</option>
         </select>
+        <label>Upload Original PDF</label>
+        <input type="file" id="originalPdf" accept="application/pdf" required>
+
         <button type="submit" id="subBtn">UPLOAD & GENERATE PDF</button>
     </form>
 </div>
@@ -176,6 +179,7 @@
 </div>
 
 <script>
+    // Note: Ensure APPS_SCRIPT_URL points to the LATEST deployment
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxpFEhpmi4WOBwuQijSQaZxsVVy5fNz22oYwb14AQ4q9epWGVnDFi7VuyXjaK4sfgnX/exec'; 
     const SHEET_READ_URL = 'https://docs.google.com/spreadsheets/d/1RBpClxl8hIRW3Y0PJdClYRebtGlYu_yJE7IWGVU_7to/gviz/tq?tqx=out:json';
     const QR_BASE = 'https://esmat-ned-gov.com/?id=';
@@ -195,10 +199,28 @@
     }
     fetchLastId();
 
+    // Helper to read file as Base64
+    const toBase64 = file => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
+
     document.getElementById('adminForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = document.getElementById('subBtn');
-        btn.disabled = true; btn.innerText = "Syncing with Cloud...";
+        btn.disabled = true; btn.innerText = "Uploading File & Syncing...";
+
+        const fileInput = document.getElementById('originalPdf');
+        let fileData = null;
+        let fileName = null;
+
+        if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            fileData = await toBase64(file);
+            fileName = file.name;
+        }
 
         const prefix = currentLastId.substring(0, currentLastId.length - 2); 
         const nextId = prefix + (parseInt(currentLastId.slice(-2), 10) + 1).toString().padStart(2, '0');
@@ -211,10 +233,14 @@
             institution: document.getElementById('institution').value,
             faculty: document.getElementById('faculty').value,
             dept: document.getElementById('dept').value,
-            type: document.getElementById('type').value
+            type: document.getElementById('type').value,
+            fileData: fileData,
+            fileName: fileName
         };
 
         try {
+            // Note: We use 'POST' with JSON body. 
+            // In Apps Script, Ensure you have the Drive API service enabled.
             await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(formData) });
 
             document.getElementById('pdf_ndn_top').innerText = nextId;
@@ -231,7 +257,7 @@
             new QRCode(document.getElementById("pdf_qrcode"), {
                 text: QR_BASE + nextId,
                 width: 110, height: 110,
-                correctLevel: QRCode.CorrectLevel.H
+                correctLevel: QRCode.Level.H
             });
 
             document.getElementById('formContainer').style.display = 'none';
@@ -245,7 +271,7 @@
                 finalCanvas.id = "canvasPreview";
             }, 600);
 
-        } catch (err) { alert("Error!"); btn.disabled = false; }
+        } catch (err) { alert("Error uploading!"); btn.disabled = false; btn.innerText = "RETRY UPLOAD"; }
     });
 
     function downloadPDF() {
