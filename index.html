@@ -220,19 +220,20 @@
         const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + ' ' + now.toTimeString().split(' ')[0];
 
         const formData = {
-    title: document.getElementById('title').value.toUpperCase(),
-    name: document.getElementById('name').value,
-    institution: document.getElementById('institution').value,
-    faculty: document.getElementById('faculty').value,
-    // Converts "Computer Science" to "CS"
-    dept: document.getElementById('dept').value
-            .split(' ')
-            .map(word => word.charAt(0).toUpperCase())
-            .join(''),
-    type: document.getElementById('type').value,
-    fileData: fileData,
-    fileName: file.name
-};
+            title: document.getElementById('title').value.toUpperCase(),
+            name: document.getElementById('name').value,
+            institution: document.getElementById('institution').value,
+            faculty: document.getElementById('faculty').value,
+            // Converts "COMPUTER engineering" or "computer science" to "Computer Engineering"
+            dept: document.getElementById('dept').value
+                    .toLowerCase()
+                    .split(' ')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                    .join(' '),
+            type: document.getElementById('type').value,
+            fileData: fileData,
+            fileName: file.name
+        };
 
         // UI UPDATES (Immediate)
         document.getElementById('pdf_ndn_top').innerText = nextId;
