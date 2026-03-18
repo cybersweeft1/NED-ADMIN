@@ -282,11 +282,14 @@
             form.action = APPS_SCRIPT_URL;
             form.target = iframe.name;
             
-            // Add data as hidden field
+            // ============================================
+            // CRITICAL FIX: URL encode the JSON data
+            // This prevents special characters in base64 from corrupting the form submission
+            // ============================================
             const input = document.createElement('input');
             input.type = 'hidden';
             input.name = 'data';
-            input.value = JSON.stringify(data);
+            input.value = encodeURIComponent(JSON.stringify(data));
             form.appendChild(input);
             
             document.body.appendChild(form);
