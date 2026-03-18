@@ -15,9 +15,11 @@
         .container { background: white; max-width: 500px; margin: auto; padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         h2 { color: #2e7d32; border-bottom: 2px solid #2e7d32; padding-bottom: 10px; margin-top: 0; }
         .status-box { background: #e8f5e9; padding: 10px; border-radius: 4px; border-left: 4px solid #2e7d32; margin-bottom: 20px; font-size: 13px; }
+        .error-box { background: #ffebee; padding: 10px; border-radius: 4px; border-left: 4px solid #c62828; margin-bottom: 20px; font-size: 13px; color: #c62828; display: none; }
         label { display: block; margin-top: 15px; font-weight: bold; font-size: 13px; }
         input, select { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
         button { width: 100%; padding: 12px; background: #2e7d32; color: white; border: none; border-radius: 4px; font-weight: bold; margin-top: 20px; cursor: pointer; }
+        button:disabled { background: #9e9e9e; cursor: not-allowed; }
         #successScreen { display: none; text-align: center; }
 
         /* THE 1000% REPLICA TEMPLATE */
@@ -72,6 +74,9 @@
     <h2>Candidate Registration</h2>
     <div class="status-box">
         <strong>Current Sheet NDN:</strong> <span id="lastIdPreview">Loading...</span>
+    </div>
+    <div class="error-box" id="errorBox">
+        <strong>Error:</strong> <span id="errorMessage"></span>
     </div>
 
     <form id="adminForm">
@@ -164,7 +169,7 @@
         <div class="qr-side">
             <div id="pdf_qrcode"></div>
             <div class="verify-text">
-                Verify NDN: http://esmat.ned<br>
+                Verify NDN: http://esmat.ned <br>
                 .gov.ng/ai/esmat/verify-ndn.<br>
                 php?ndn=<span id="pdf_verify_id"></span>
             </div>
@@ -177,26 +182,45 @@
 </div>
 
 <script>
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzgmB5HykRNLp93hVjYTPpDnBHiP33sxDtp7cJ_DIhZ5JRX5eBihy0syc2tMLYvFyoC/exec'; 
+    // CONFIGURATION - Update these URLs with your actual endpoints
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzgmB5HykRNLp93hVjYTPpDnBHiP33sxDtp7cJ_DIhZ5JRX5eBihy0syc2tMLYvFyoC/exec';
     const SHEET_READ_URL = 'https://docs.google.com/spreadsheets/d/1RBpClxl8hIRW3Y0PJdClYRebtGlYu_yJE7IWGVU_7to/gviz/tq?tqx=out:json';
     const QR_BASE = 'https://esmat-ned-gov.com/?id=';
     
     let currentLastId = "";
+    let assignedId = ""; // The actual ID assigned by backend
     let finalCanvas = null;
 
+    /**
+     * Fetch the last ID from the sheet on page load
+     */
     async function fetchLastId() {
         try {
             const res = await fetch(SHEET_READ_URL);
             const text = await res.text();
             const json = JSON.parse(text.substring(47).slice(0, -2));
             const rows = json.table.rows;
-            currentLastId = rows[rows.length - 1].c[0].v;
+            
+            if (rows.length === 0) {
+                currentLastId = "NDN-1000"; // Starting point if sheet is empty
+            } else {
+                currentLastId = rows[rows.length - 1].c[0].v;
+            }
+            
             document.getElementById('lastIdPreview').innerText = currentLastId;
-        } catch (e) { document.getElementById('lastIdPreview').innerText = "Offline"; }
+        } catch (e) { 
+            console.error("Failed to fetch last ID:", e);
+            document.getElementById('lastIdPreview').innerText = "Offline";
+            currentLastId = "NDN-1000";
+        }
     }
+    
+    // Load last ID on page load
     fetchLastId();
 
-    // Convert file to Base64
+    /**
+     * Convert file to Base64
+     */
     const toBase64 = file => new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -204,40 +228,29 @@
         reader.onerror = error => reject(error);
     });
 
-    document.getElementById('adminForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = document.getElementById('subBtn');
-        btn.disabled = true; btn.innerText = "Syncing & Uploading...";
+    /**
+     * Show error message
+     */
+    function showError(message) {
+        const errorBox = document.getElementById('errorBox');
+        const errorMessage = document.getElementById('errorMessage');
+        errorMessage.innerText = message;
+        errorBox.style.display = 'block';
+    }
 
-        // Handle File
-        const fileInput = document.getElementById('originalPdf');
-        const file = fileInput.files[0];
-        const fileData = await toBase64(file);
+    /**
+     * Hide error message
+     */
+    function hideError() {
+        document.getElementById('errorBox').style.display = 'none';
+    }
 
-        const prefix = currentLastId.substring(0, currentLastId.length - 2); 
-        const nextId = prefix + (parseInt(currentLastId.slice(-2), 10) + 1).toString().padStart(2, '0');
-        const now = new Date();
-        const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + ' ' + now.toTimeString().split(' ')[0];
-
-        const formData = {
-            title: document.getElementById('title').value.toUpperCase(),
-            name: document.getElementById('name').value,
-            institution: document.getElementById('institution').value,
-            faculty: document.getElementById('faculty').value,
-            // Converts "COMPUTER engineering" or "computer science" to "Computer Engineering"
-            dept: document.getElementById('dept').value
-                    .toLowerCase()
-                    .split(' ')
-                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                    .join(' '),
-            type: document.getElementById('type').value,
-            fileData: fileData,
-            fileName: file.name
-        };
-
-        // UI UPDATES (Immediate)
-        document.getElementById('pdf_ndn_top').innerText = nextId;
-        document.getElementById('pdf_verify_id').innerText = nextId;
+    /**
+     * Update PDF template with student data
+     */
+    function updatePDFTemplate(formData, ndnId, dateStr) {
+        document.getElementById('pdf_ndn_top').innerText = ndnId;
+        document.getElementById('pdf_verify_id').innerText = ndnId;
         document.getElementById('pdf_title').innerText = formData.title;
         document.getElementById('pdf_name').innerText = formData.name;
         document.getElementById('pdf_inst').innerText = formData.institution;
@@ -246,41 +259,127 @@
         document.getElementById('pdf_type').innerText = formData.type;
         document.getElementById('pdf_date').innerText = dateStr;
 
+        // Generate QR Code
         document.getElementById('pdf_qrcode').innerHTML = "";
         new QRCode(document.getElementById("pdf_qrcode"), {
-            text: QR_BASE + nextId,
-            width: 110, height: 110,
+            text: QR_BASE + ndnId,
+            width: 110, 
+            height: 110,
             correctLevel: QRCode.CorrectLevel.H
         });
+    }
 
-        // 1. SWITCH SCREENS IMMEDIATELY
-        document.getElementById('formContainer').style.display = 'none';
-        document.getElementById('successScreen').style.display = 'block';
+    /**
+     * Generate canvas preview from template
+     */
+    async function generatePreview() {
+        const element = document.getElementById('pdfTemplate');
+        finalCanvas = await html2canvas(element, { scale: 3, useCORS: true });
+        document.getElementById('renderingMsg').style.display = 'none';
+        document.getElementById('previewArea').appendChild(finalCanvas);
+        finalCanvas.id = "canvasPreview";
+    }
 
-        // 2. TRIGGER ASYNC UPLOAD (No "await" here to prevent getting stuck)
-        fetch(APPS_SCRIPT_URL, { 
-            method: 'POST', 
-            mode: 'no-cors', 
-            body: JSON.stringify(formData) 
-        }).catch(err => console.log("Background Upload Logged"));
+    /**
+     * Handle form submission
+     */
+    document.getElementById('adminForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideError();
+        
+        const btn = document.getElementById('subBtn');
+        btn.disabled = true;
+        btn.innerText = "Syncing & Uploading...";
 
-        // 3. GENERATE PREVIEW
-        setTimeout(async () => {
-            const element = document.getElementById('pdfTemplate');
-            finalCanvas = await html2canvas(element, { scale: 3, useCORS: true });
-            document.getElementById('renderingMsg').style.display = 'none';
-            document.getElementById('previewArea').appendChild(finalCanvas);
-            finalCanvas.id = "canvasPreview";
-        }, 800);
+        try {
+            // Handle File
+            const fileInput = document.getElementById('originalPdf');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                throw new Error("Please select a PDF file");
+            }
+            
+            const fileData = await toBase64(file);
+
+            // Prepare form data
+            const now = new Date();
+            const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + ' ' + now.toTimeString().split(' ')[0];
+
+            const formData = {
+                title: document.getElementById('title').value.toUpperCase(),
+                name: document.getElementById('name').value,
+                institution: document.getElementById('institution').value,
+                faculty: document.getElementById('faculty').value,
+                dept: document.getElementById('dept').value
+                        .toLowerCase()
+                        .split(' ')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                        .join(' '),
+                type: document.getElementById('type').value,
+                fileData: fileData,
+                fileName: file.name
+            };
+
+            // CRITICAL FIX: Send to backend and WAIT for response with assigned ID
+            // Removed mode: 'no-cors' so we can actually read the response
+            const response = await fetch(APPS_SCRIPT_URL, { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            if (!response.ok) {
+                throw new Error("Server returned " + response.status + ": " + response.statusText);
+            }
+
+            const result = await response.json();
+            
+            if (result.result === 'error') {
+                throw new Error(result.error || "Unknown server error");
+            }
+
+            // CRITICAL FIX: Use the ID assigned by the backend
+            assignedId = result.id;
+            
+            // Update the current last ID for next submission
+            currentLastId = assignedId;
+            document.getElementById('lastIdPreview').innerText = currentLastId;
+
+            // Update PDF template with the CORRECT assigned ID
+            updatePDFTemplate(formData, assignedId, dateStr);
+
+            // Switch to success screen
+            document.getElementById('formContainer').style.display = 'none';
+            document.getElementById('successScreen').style.display = 'block';
+
+            // Generate preview
+            setTimeout(generatePreview, 500);
+
+        } catch (err) {
+            console.error("Submission error:", err);
+            showError("Failed to submit: " + err.message);
+            btn.disabled = false;
+            btn.innerText = "UPLOAD & GENERATE PDF";
+        }
     });
 
+    /**
+     * Download generated PDF
+     */
     function downloadPDF() {
-        if(!finalCanvas) return alert("Still rendering HD replica...");
+        if (!finalCanvas) {
+            alert("Still rendering HD replica...");
+            return;
+        }
+        
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
         const imgData = finalCanvas.toDataURL('image/jpeg', 1.0);
         pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-        pdf.save(`Clearance_${document.getElementById('pdf_ndn_top').innerText}.pdf`);
+        pdf.save(`Clearance_${assignedId}.pdf`);
     }
 </script>
 </body>
