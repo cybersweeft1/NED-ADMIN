@@ -231,6 +231,29 @@
     });
 
     // ============================================
+    // CRITICAL FIX: String-based increment to avoid JavaScript number precision loss
+    // Matches the incrementLargeString function in Apps Script
+    // ============================================
+    function incrementLargeString(str) {
+        // Remove any leading zeros for processing, but track the original length
+        const originalLength = str.length;
+        let digits = str.split('').map(Number);
+
+        for (let i = digits.length - 1; i >= 0; i--) {
+            if (digits[i] < 9) {
+                digits[i]++;
+                // Ensure we maintain the same number of digits (pad with leading zeros if needed)
+                const result = digits.join('');
+                return result.padStart(originalLength, '0');
+            }
+            digits[i] = 0;
+        }
+
+        // If we get here, we need to add a new digit (e.g., 999 -> 1000)
+        return '1' + digits.join('');
+    }
+
+    // ============================================
     // CRITICAL FIX: Proper CORS handling for Google Apps Script
     // ============================================
     
@@ -349,19 +372,17 @@
             const fileData = await toBase64(file);
 
             // ============================================
-            // CRITICAL FIX: Better ID generation logic
+            // CRITICAL FIX: String-based ID generation to match Apps Script exactly
             // ============================================
-            // Safely parse the last ID and increment
             let nextId;
             if (currentLastId && currentLastId.includes('-')) {
                 const parts = currentLastId.split('-');
                 const prefix = parts[0] + '-';
                 const numPart = parts[1];
                 
-                // Parse as integer to increment, then pad back to original length
-                const nextNum = parseInt(numPart, 10) + 1;
-                const paddedNum = nextNum.toString().padStart(numPart.length, '0');
-                nextId = prefix + paddedNum;
+                // CRITICAL: Use string increment, NOT parseInt, to avoid scientific notation
+                const nextNumPart = incrementLargeString(numPart);
+                nextId = prefix + nextNumPart;
             } else {
                 // Fallback if we couldn't read current ID
                 nextId = "NDN-1001";
