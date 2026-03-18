@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin - NDN Generator & PDF System</title>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <!-- FIXED: Updated QRCode library to more reliable CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -16,6 +17,7 @@
         h2 { color: #2e7d32; border-bottom: 2px solid #2e7d32; padding-bottom: 10px; margin-top: 0; }
         .status-box { background: #e8f5e9; padding: 10px; border-radius: 4px; border-left: 4px solid #2e7d32; margin-bottom: 20px; font-size: 13px; }
         .error-box { background: #ffebee; padding: 10px; border-radius: 4px; border-left: 4px solid #c62828; margin-bottom: 20px; font-size: 13px; color: #c62828; display: none; }
+        .warning-box { background: #fff3e0; padding: 10px; border-radius: 4px; border-left: 4px solid #ef6c00; margin-bottom: 20px; font-size: 13px; color: #ef6c00; display: none; }
         label { display: block; margin-top: 15px; font-weight: bold; font-size: 13px; }
         input, select { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
         button { width: 100%; padding: 12px; background: #2e7d32; color: white; border: none; border-radius: 4px; font-weight: bold; margin-top: 20px; cursor: pointer; }
@@ -32,7 +34,7 @@
         .header-line { border-top: 2px solid #000; margin-bottom: 25px; }
         .pdf-header { color: #2e7d32; font-weight: bold; font-size: 24px; display: inline-block; margin-bottom: 15px; }
         .top-ndn { float: right; font-size: 14px; font-weight: bold; color: #333; margin-top: 10px; }
-        
+
         .field-block { margin-bottom: 18px; clear: both; }
         .pdf-row { display: flex; align-items: flex-start; margin-bottom: 3px; font-size: 15px; }
         .pdf-label { font-weight: bold; min-width: 145px; }
@@ -50,10 +52,10 @@
         .logo-img { width: 55px; margin-top: 5px; }
         .issued-text { font-size: 13px; line-height: 1.4; }
         .nerd-brand { font-size: 18px; font-weight: bold; color: #2e7d32; margin-bottom: 2px; }
-        
+
         .qr-side { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
         #pdf_qrcode { display: inline-block; margin-bottom: 10px; }
-        
+
         .verify-text { 
             font-size: 14px; 
             color: #333; 
@@ -78,6 +80,10 @@
     <div class="error-box" id="errorBox">
         <strong>Error:</strong> <span id="errorMessage"></span>
     </div>
+    <!-- NEW: Warning box for non-critical issues -->
+    <div class="warning-box" id="warningBox">
+        <strong>Notice:</strong> <span id="warningMessage"></span>
+    </div>
 
     <form id="adminForm">
         <label>Project Title (Auto-Caps)</label>
@@ -95,7 +101,7 @@
             <option value="Project">Project</option>
             <option value="Thesis">Thesis</option>
         </select>
-        <label>Upload Original PDF (Mandatory)</label>
+        <label>Upload Original PDF (Mandatory, Max 10MB)</label>
         <input type="file" id="originalPdf" accept="application/pdf" required>
 
         <button type="submit" id="subBtn">UPLOAD & GENERATE PDF</button>
@@ -182,205 +188,20 @@
 </div>
 
 <script>
-    // CONFIGURATION - Update these URLs with your actual endpoints
+    // =============================================================================
+    // CONFIGURATION - UPDATE THESE URLs WITH YOUR ACTUAL ENDPOINTS
+    // =============================================================================
+
+    // CRITICAL: Replace this with your NEW deployment URL after updating Apps Script
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzgmB5HykRNLp93hVjYTPpDnBHiP33sxDtp7cJ_DIhZ5JRX5eBihy0syc2tMLYvFyoC/exec';
+
+    // Google Sheets visualization API for reading last ID
     const SHEET_READ_URL = 'https://docs.google.com/spreadsheets/d/1RBpClxl8hIRW3Y0PJdClYRebtGlYu_yJE7IWGVU_7to/gviz/tq?tqx=out:json';
+
+    // Base URL for QR code generation
     const QR_BASE = 'https://esmat-ned-gov.com/?id=';
-    
-    let currentLastId = "";
-    let assignedId = ""; // The actual ID assigned by backend
-    let finalCanvas = null;
 
-    /**
-     * Fetch the last ID from the sheet on page load
-     */
-    async function fetchLastId() {
-        try {
-            const res = await fetch(SHEET_READ_URL);
-            const text = await res.text();
-            const json = JSON.parse(text.substring(47).slice(0, -2));
-            const rows = json.table.rows;
-            
-            if (rows.length === 0) {
-                currentLastId = "NDN-1000"; // Starting point if sheet is empty
-            } else {
-                currentLastId = rows[rows.length - 1].c[0].v;
-            }
-            
-            document.getElementById('lastIdPreview').innerText = currentLastId;
-        } catch (e) { 
-            console.error("Failed to fetch last ID:", e);
-            document.getElementById('lastIdPreview').innerText = "Offline";
-            currentLastId = "NDN-1000";
-        }
-    }
-    
-    // Load last ID on page load
-    fetchLastId();
+    // Maximum file size (10MB to stay well under Apps Script 50MB limit)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 
-    /**
-     * Convert file to Base64
-     */
-    const toBase64 = file => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
-    });
-
-    /**
-     * Show error message
-     */
-    function showError(message) {
-        const errorBox = document.getElementById('errorBox');
-        const errorMessage = document.getElementById('errorMessage');
-        errorMessage.innerText = message;
-        errorBox.style.display = 'block';
-    }
-
-    /**
-     * Hide error message
-     */
-    function hideError() {
-        document.getElementById('errorBox').style.display = 'none';
-    }
-
-    /**
-     * Update PDF template with student data
-     */
-    function updatePDFTemplate(formData, ndnId, dateStr) {
-        document.getElementById('pdf_ndn_top').innerText = ndnId;
-        document.getElementById('pdf_verify_id').innerText = ndnId;
-        document.getElementById('pdf_title').innerText = formData.title;
-        document.getElementById('pdf_name').innerText = formData.name;
-        document.getElementById('pdf_inst').innerText = formData.institution;
-        document.getElementById('pdf_faculty').innerText = formData.faculty;
-        document.getElementById('pdf_dept').innerText = formData.dept;
-        document.getElementById('pdf_type').innerText = formData.type;
-        document.getElementById('pdf_date').innerText = dateStr;
-
-        // Generate QR Code
-        document.getElementById('pdf_qrcode').innerHTML = "";
-        new QRCode(document.getElementById("pdf_qrcode"), {
-            text: QR_BASE + ndnId,
-            width: 110, 
-            height: 110,
-            correctLevel: QRCode.CorrectLevel.H
-        });
-    }
-
-    /**
-     * Generate canvas preview from template
-     */
-    async function generatePreview() {
-        const element = document.getElementById('pdfTemplate');
-        finalCanvas = await html2canvas(element, { scale: 3, useCORS: true });
-        document.getElementById('renderingMsg').style.display = 'none';
-        document.getElementById('previewArea').appendChild(finalCanvas);
-        finalCanvas.id = "canvasPreview";
-    }
-
-    /**
-     * Handle form submission
-     */
-    document.getElementById('adminForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        hideError();
-        
-        const btn = document.getElementById('subBtn');
-        btn.disabled = true;
-        btn.innerText = "Syncing & Uploading...";
-
-        try {
-            // Handle File
-            const fileInput = document.getElementById('originalPdf');
-            const file = fileInput.files[0];
-            
-            if (!file) {
-                throw new Error("Please select a PDF file");
-            }
-            
-            const fileData = await toBase64(file);
-
-            // Prepare form data
-            const now = new Date();
-            const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + ' ' + now.toTimeString().split(' ')[0];
-
-            const formData = {
-                title: document.getElementById('title').value.toUpperCase(),
-                name: document.getElementById('name').value,
-                institution: document.getElementById('institution').value,
-                faculty: document.getElementById('faculty').value,
-                dept: document.getElementById('dept').value
-                        .toLowerCase()
-                        .split(' ')
-                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                        .join(' '),
-                type: document.getElementById('type').value,
-                fileData: fileData,
-                fileName: file.name
-            };
-
-            // CRITICAL FIX: Use text/plain content type to avoid CORS preflight
-            // This makes it a "simple request" that doesn't trigger OPTIONS
-            const response = await fetch(APPS_SCRIPT_URL, { 
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8'
-                },
-                body: JSON.stringify(formData)
-            });
-
-            if (!response.ok) {
-                throw new Error("Server returned " + response.status + ": " + response.statusText);
-            }
-
-            const result = await response.json();
-            
-            if (result.result === 'error') {
-                throw new Error(result.error || "Unknown server error");
-            }
-
-            // CRITICAL FIX: Use the ID assigned by the backend
-            assignedId = result.id;
-            
-            // Update the current last ID for next submission
-            currentLastId = assignedId;
-            document.getElementById('lastIdPreview').innerText = currentLastId;
-
-            // Update PDF template with the CORRECT assigned ID
-            updatePDFTemplate(formData, assignedId, dateStr);
-
-            // Switch to success screen
-            document.getElementById('formContainer').style.display = 'none';
-            document.getElementById('successScreen').style.display = 'block';
-
-            // Generate preview
-            setTimeout(generatePreview, 500);
-
-        } catch (err) {
-            console.error("Submission error:", err);
-            showError("Failed to submit: " + err.message);
-            btn.disabled = false;
-            btn.innerText = "UPLOAD & GENERATE PDF";
-        }
-    });
-
-    /**
-     * Download generated PDF
-     */
-    function downloadPDF() {
-        if (!finalCanvas) {
-            alert("Still rendering HD replica...");
-            return;
-        }
-        
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const imgData = finalCanvas.toDataURL('image/jpeg', 1.0);
-        pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-        pdf.save(`Clearance_${assignedId}.pdf`);
-    }
-</script>
-</body>
-</html>
+    // =====================<response clipped><NOTE>Result is longer than **10000 characters**, will be **truncated**.</NOTE>
