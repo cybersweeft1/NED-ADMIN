@@ -13,11 +13,11 @@
         /* UI Styles - PRESERVED EXACTLY AS ORIGINAL */
         body { font-family: 'Helvetica', Arial, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
         .container { background: white; max-width: 500px; margin: auto; padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h2 { color: #2e7d32; border-bottom: 2px solid #2e7d32; padding-bottom: 10px; margin-top: 0; }
-        .status-box { background: #e8f5e9; padding: 10px; border-radius: 4px; border-left: 4px solid #2e7d32; margin-bottom: 20px; font-size: 13px; }
+        h2 { color: #155c19; border-bottom: 2px solid #155c19; padding-bottom: 10px; margin-top: 0; }
+        .status-box { background: #e8f5e9; padding: 10px; border-radius: 4px; border-left: 4px solid #155c19; margin-bottom: 20px; font-size: 13px; }
         label { display: block; margin-top: 15px; font-weight: bold; font-size: 13px; }
         input, select { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #2e7d32; color: white; border: none; border-radius: 4px; font-weight: bold; margin-top: 20px; cursor: pointer; }
+        button { width: 100%; padding: 12px; background: #155c19; color: white; border: none; border-radius: 4px; font-weight: bold; margin-top: 20px; cursor: pointer; }
         #successScreen { display: none; text-align: center; }
 
         /* THE 1000% REPLICA TEMPLATE - PRESERVED EXACTLY */
@@ -28,7 +28,7 @@
             color: #000; text-align: left; line-height: 1.2;
         }
         .header-line { border-top: 2px solid #000; margin-bottom: 25px; }
-        .pdf-header { color: #2e7d32; font-weight: bold; font-size: 24px; display: inline-block; margin-bottom: 15px; }
+        .pdf-header { color: #155c19; font-weight: bold; font-size: 24px; display: inline-block; margin-bottom: 15px; }
         .top-ndn { float: right; font-size: 14px; font-weight: bold; color: #333; margin-top: 10px; }
         
         .field-block { margin-bottom: 18px; clear: both; }
@@ -47,7 +47,7 @@
         .issued-left { display: flex; align-items: flex-start; gap: 12px; }
         .logo-img { width: 55px; margin-top: 5px; }
         .issued-text { font-size: 13px; line-height: 1.4; }
-        .nerd-brand { font-size: 18px; font-weight: bold; color: #2e7d32; margin-bottom: 2px; }
+        .nerd-brand { font-size: 18px; font-weight: bold; color: #155c19; margin-bottom: 2px; }
         
         .qr-side { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
         #pdf_qrcode { display: inline-block; margin-bottom: 10px; }
@@ -113,7 +113,7 @@
 </div>
 
 <div class="container" id="successScreen">
-    <h2 style="color: #2e7d32;">Clearance Ready</h2>
+    <h2 style="color: #155c19;">Clearance Ready</h2>
     <div class="preview-container" id="previewArea">
         <p id="renderingMsg">Generating Document...</p>
     </div>
@@ -439,7 +439,7 @@
                 console.log("Upload result:", result);
                 const syncStatus = document.getElementById('syncStatus');
                 if (result.success) {
-                    syncStatus.innerHTML = '<span style="color: #2e7d32;">✓ Synced to database</span>';
+                    syncStatus.innerHTML = '<span style="color: #155c19;">✓ Synced to database</span>';
                 } else {
                     syncStatus.innerHTML = '<span style="color: #ff9800;">⚠ Upload pending (will retry)</span>';
                 }
